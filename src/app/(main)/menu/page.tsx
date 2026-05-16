@@ -10,25 +10,25 @@ async function page() {
   const activeCategories = categories.filter((cat) => cat.isActive);
 
 
-  const groupByTwo = (arr) => {
-    let result = []
-    for (let i = 0; i < arr.length; i += 2) {
-      result.push((arr.slice(i, i + 2)))
-    }
-    return result
-  }
+  // const groupByTwo = (arr) => {
+  //   let result = []
+  //   for (let i = 0; i < arr.length; i += 2) {
+  //     result.push((arr.slice(i, i + 2)))
+  //   }
+  //   return result
+  // }
 
-  // console.log(categories)
-  const a = groupByTwo(categories)
-  // console.log(a)
+  // // console.log(categories)
+  // const a = groupByTwo(categories)
+  // // console.log(a)
 
   return (
     <>
-      <SessionInitializer /> {/* ⭐ جدید */}
-      <div className="h-[100dvh] flex flex-col  px-2 pt-20 pb-10">
+      <SessionInitializer /> 
+      <div className="flex flex-col  px-2  pb-10">
         <p className="text-white text-[26px]">Menu</p>
         <div>
-          <CategoryGrid categories={a} />
+          <CategoryGrid categories={categories} />
         </div>
       </div>
     </>
