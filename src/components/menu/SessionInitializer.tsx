@@ -1,30 +1,27 @@
-// src/components/menu/SessionInitializer.tsx
 "use client";
 
 import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
 
 export default function SessionInitializer() {
-    const searchParams = useSearchParams();
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
 
-    useEffect(() => {
-        const tableParam = searchParams.get("table");
+    const tableParam = params.get("table");
 
+    if (tableParam) {
+      localStorage.setItem("tableId", tableParam);
+    }
 
-        if (tableParam) {
-            localStorage.setItem("tableId", tableParam);
-        }
+    let sessionId = localStorage.getItem("sessionId");
 
-        let sessionId = localStorage.getItem("sessionId");
-        if (!sessionId) {
-            sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            localStorage.setItem("sessionId", sessionId);
-        } else {
-        }
+    if (!sessionId) {
+      sessionId = `session_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 9)}`;
 
-        // چک کن که واقعاً ذخیره شدن
+      localStorage.setItem("sessionId", sessionId);
+    }
+  }, []);
 
-    }, [searchParams]);
-
-    return null;
+  return null;
 }

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node server.js",
     "build": "next build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "cross-env NODE_ENV=production node server.js",
     "lint": "eslint",
     "seed": "tsx scripts/seed.ts"
   },
@@ -17,6 +17,7 @@
     "@tanstack/react-query-devtools": "^5.100.5",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
+    "cross-env": "^10.1.0",
     "dotenv": "^17.4.2",
     "embla-carousel-auto-scroll": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
