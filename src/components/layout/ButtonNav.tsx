@@ -34,7 +34,7 @@ export default function ButtonNav() {
             rounded-[10px]
             px-3 py-1
             shadow-[0_8px_32px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.1)]
-            fixed bottom-0  left-1/2 -translate-x-1/2 w-[350px] 
+            fixed bottom-0  left-1/2 -translate-x-1/2 w-full max-w-[450px] 
             '>
                 <div className='flex items-center relative justify-around'>
                     {

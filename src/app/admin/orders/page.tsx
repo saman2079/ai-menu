@@ -248,10 +248,10 @@ export default function OrdersPage() {
                       className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0"
                     >
                       <span className="text-gray-700">
-                        {item.menuItem.name} × {item.quantity}
+                        {item.menuItem?.name} × {item.quantity}
                       </span>
                       <span className="font-medium text-gray-900">
-                        {(item.menuItem.price * item.quantity).toLocaleString()}{" "}
+                        {(item.menuItem?.price * item.quantity).toLocaleString()}{" "}
                         $
                       </span>
                     </div>
