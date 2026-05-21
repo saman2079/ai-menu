@@ -12,13 +12,13 @@ export default function MainLayout({
   return (
     <div className="w-full min-h-[100dvh]">
       <ScrollContainer>
-        <div className="min-h-[100dvh] mx-auto w-full max-w-[450px] ">
-          <div className="bg-[#090100]/69 w-full min-h-[100dvh] relative ">
+        <div className="min-h-[100dvh] mx-auto w-full max-w-[375px]  ">
+          <div className=" w-full min-h-[100dvh] relative ">
             <Suspense fallback={null}>
               <SessionInitializer />
             </Suspense>
             {children}
-            <ButtonNav />
+            {/* <ButtonNav /> */}
           </div>
         </div>
       </ScrollContainer>
