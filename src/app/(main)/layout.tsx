@@ -18,7 +18,7 @@ export default function MainLayout({
               <SessionInitializer />
             </Suspense>
             {children}
-            {/* <ButtonNav /> */}
+            <ButtonNav />
           </div>
         </div>
       </ScrollContainer>
