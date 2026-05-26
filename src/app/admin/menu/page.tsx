@@ -389,7 +389,7 @@ export default function AdminMenuPage() {
                     <div>
                       <label className="block mb-2 font-medium">price </label>
                       <input
-                        type="number"
+                        type="text"
                         value={formData.price}
                         onChange={(e) =>
                           setFormData({

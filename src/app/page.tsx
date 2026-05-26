@@ -3,8 +3,8 @@ import React from 'react'
 
 function Home() {
   return (
-    <div className="bg-[url('/home-bg.png')] text-center text-white bg-center bg-no-repeat flex flex-col justify-between py-8 px-5 min-h-[100dvh]">
-      <div className='space-y-10'>
+    <div className="bg-[url('/imge/home-bg.png')] max-w-[375px] mx-auto text-center text-white bg-center bg-no-repeat flex flex-col justify-between py-8 px-5 min-h-[100dvh]">
+      <div className='space-y-10 '>
         <div>
           <p>میز ۱۲</p>
         </div>

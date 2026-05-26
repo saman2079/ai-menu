@@ -1,7 +1,7 @@
 
 import ButtonNav from "@/components/layout/ButtonNav";
 import ScrollContainer from "@/components/layout/scroll-container";
-import SessionInitializer from "@/components/menu/SessionInitializer";
+// import SessionInitializer from "@/components/menu/SessionInitializer";
 import { Suspense } from "react";
 
 export default function MainLayout({
@@ -10,18 +10,18 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="w-full min-h-[100dvh]">
-      <ScrollContainer>
-        <div className="min-h-[100dvh] mx-auto w-full max-w-[375px]  ">
+    <div dir="rtl" className="w-full min-h-[100dvh]">
+      {/* <ScrollContainer> */}
+        <div className="min-h-[100dvh] mx-auto w-full max-w-[420px]  ">
           <div className=" w-full min-h-[100dvh] relative ">
             <Suspense fallback={null}>
-              <SessionInitializer />
+              {/* <SessionInitializer /> */}
             </Suspense>
             {children}
             <ButtonNav />
           </div>
         </div>
-      </ScrollContainer>
+      {/* </ScrollContainer> */}
     </div>
   );
 }

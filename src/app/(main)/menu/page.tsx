@@ -1,27 +1,25 @@
-export const dynamic = "force-dynamic";
+import CategoryBar from '@/components/menu/CategoryBar'
+import Header from '@/components/menu/Header'
+import MenuList from '@/components/menu/MenuList'
+import { getMenuItems } from '@/services/menu'
+import Image from 'next/image'
+import React from 'react'
 
-import Header from "@/components/layout/Header";
-import CategoryGrid from "@/components/menu/CategoryGrid";
-import Sidebar from "@/components/layout/Sidebar";
-import { getCategories } from "@/services/categories";
-import SessionInitializer from "@/components/menu/SessionInitializer";
-
-async function page() {
-  const categories = await getCategories();
-  const activeCategories = categories.filter((cat) => cat.isActive);
-
+async function Menu() {
+  const data = await getMenuItems()
   return (
-    <>
-      <SessionInitializer />
-      <div className="flex flex-col px-2 pb-10">
-        <p className="text-white text-[26px]">Menu</p>
+    <div className='min-h-[100dvh]'>
+      <Header />
 
-        <div>
-          <CategoryGrid categories={categories} />
-        </div>
+
+      <div className='-mt-10 space-y-5'>
+        <CategoryBar categories={data.categories} />
+        <MenuList items ={data.items} />
       </div>
-    </>
-  );
+
+
+    </div>
+  )
 }
 
-export default page;
+export default Menu
