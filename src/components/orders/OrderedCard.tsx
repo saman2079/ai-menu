@@ -1,76 +1,59 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
-import React from "react";
 
-export default function OrderedCard({ item, onRemove, onQtyChange }) {
-  const [qty, setQty] = useState(item.quantity || 1);
-
-  const increase = () => {
-    const newQty = qty + 1;
-    setQty(newQty);
-    onQtyChange(item.id, newQty);
+interface Props {
+  item: {
+    _id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    image?: string;
   };
+  onIncrease: () => void;
+  onDecrease: () => void;
+}
 
-  const decrease = () => {
-    if (qty > 1) {
-      const newQty = qty - 1;
-      setQty(newQty);
-      onQtyChange(item.id, newQty);
-    } else {
-      onRemove(item.id);
-    }
-  };
-
+export default function OrderedCard({ item, onIncrease, onDecrease }: Props) {
   return (
-    <div className="w-[85%] mx-auto bg-[#B1B1B1]/20 rounded-[34px] border border-[#707070] backdrop-blur-[20px] shadow-xl flex gap-4 items-end-safe relative overflow-hidden">
-      <Image
-        width={159}
-        height={159}
-        src={item.image || "/placeholder.png"}
-        alt={item.name}
-        className="rounded-[34px] w-[40%] "
-      />
+    <div className="w-full bg-[#F9F9F9] rounded-[18px] p-3 flex items-center justify-between shadow-sm border border-[#ECECEC]">
+      <div className="flex items-center gap-3">
+        <div className="flex flex-col items-center gap-1">
+          <button
+            onClick={onIncrease}
+            className="w-6 h-6 rounded-full bg-[#1E1E1E] text-white text-sm flex items-center justify-center"
+          >
+            +
+          </button>
 
-      <div className="flex flex-col gap-1 mb-6">
-        <p className="text-[18px] text-white">{item.name}</p>
-        <p className="text-[14px] text-gray-300 line-clamp-2">{item.desc}</p>
+          <span className="text-[14px] font-bold text-[#1E1E1E]">
+            {item.quantity}
+          </span>
 
-        <div className="w-full flex items-center gap-3 pt-3">
-          <p className="text-[#EFE7BC] text-[21px]">{item.price}</p>
+          <button
+            onClick={onDecrease}
+            className="w-6 h-6 rounded-full bg-[#EDEDED] text-[#1E1E1E] text-sm flex items-center justify-center"
+          >
+            -
+          </button>
+        </div>
 
-          <div className="flex items-center justify-between">
-            <button
-              onClick={decrease}
-              className="text-[#202020] bg-white text-[25px] w-[30px] h-[32px] rounded-[7px] flex items-center justify-center"
-            >
-              −
-            </button>
-
-            <span className="text-white text-[17px] font-semibold px-3">
-              {qty}
-            </span>
-
-            <button
-              onClick={increase}
-              className="text-[#202020] bg-white text-[25px] w-[30px] h-[32px] rounded-[7px] flex items-center justify-center"
-            >
-              +
-            </button>
-          </div>
+        <div>
+          <p className="text-[16px] font-bold text-[#1E1E1E]">{item.name}</p>
+          <p className="text-[13px] text-[#777]">
+            {item.price.toLocaleString()} تومان
+          </p>
         </div>
       </div>
 
-      <button onClick={() => onRemove(item.id)}>
+      <div className="relative w-[82px] h-[82px] rounded-[14px] overflow-hidden bg-[#DDD]">
         <Image
-          width={14}
-          height={14}
-          src={"/icons/closebtn.svg"}
-          alt="close btn"
-          className="absolute top-4 right-4 cursor-pointer"
+          src={item.image || "/images/placeholder.jpg"}
+          alt={item.name}
+          fill
+          className="object-cover"
         />
-      </button>
+      </div>
     </div>
   );
 }

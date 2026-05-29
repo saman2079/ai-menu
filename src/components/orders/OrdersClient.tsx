@@ -1,13 +1,15 @@
 "use client";
 
-import { useOrderStore } from "@/app/hooks/orderStore";
+import { useState } from "react";
 import Invoice from "./Invoice";
 import OrdersList from "./OrdersList";
 
-
-
 export default function OrdersClient() {
-  const showInvoice = useOrderStore((s) => s.showInvoice);
+  const [submittedOrder, setSubmittedOrder] = useState<any>(null);
 
-  return showInvoice ? <Invoice /> : <OrdersList />;
+  return submittedOrder ? (
+    <Invoice order={submittedOrder} onClose={() => setSubmittedOrder(null)} />
+  ) : (
+    <OrdersList onSubmitted={setSubmittedOrder} />
+  );
 }

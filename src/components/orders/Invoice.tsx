@@ -1,44 +1,43 @@
 "use client";
 
 import Image from "next/image";
-import { useOrderStore } from "@/app/hooks/orderStore";
 
 interface Props {
-  order?: any; // اگه مستقیم پاس بدی
+  order?: any;
+  onClose?: () => void;
 }
 
-export default function Invoice({ order: propOrder }: Props) {
-  const storeOrder = useOrderStore((s) => s.invoiceData);
-  const closeInvoice = useOrderStore((s) => s.closeInvoice);
-
-  const order = propOrder || storeOrder;
+export default function Invoice({ order, onClose }: Props) {
   if (!order) return null;
 
-
   return (
-    <div className="animate-invoice w-[85%] max-w-[420px] bg-[#B1B1B1]/13 mt-4 text-white rounded-[30px] backdrop-blur-[50px] border border-[#707070] relative">
-      <button onClick={closeInvoice} className="absolute top-6 right-6">
-        <Image src="/icons/closebtn.svg" width={15} height={15} alt="close" />
-      </button>
+    <div className="w-full flex flex-col items-center pt-2">
+      <div className="relative w-full flex items-center justify-center mb-8">
+        <h1 className="text-[22px] font-bold text-[#1E1E1E]">
+          سفارش شما ثبت شد!
+        </h1>
 
-      <div className="flex flex-col gap-4 p-6">
-        <p className="text-[20px] font-bold">Order #{order.orderNumber}</p>
-
-        {order.items.map((item: any) => (
-          <div key={item._id} className="flex justify-between text-[18px]">
-            <span>{item.name} × {item.quantity}</span>
-            <span className="text-[#EFE7BC]">
-              ${(item.price * item.quantity).toFixed(2)}
-            </span>
-          </div>
-        ))}
       </div>
 
-      <div className="w-full h-[1px] bg-[#707070]" />
+      <div className="w-[220px] h-[220px] rounded-full border-2 border-[#A3A3A3] flex items-center justify-center">
+        <div className="w-[180px] h-[180px] rounded-full border border-[#BDBDBD] flex items-center justify-center">
+          <Image
+            src="/imge/order.png"
+            width={70}
+            height={70}
+            alt="coffee cup"
+            className="opacity-70"
+          />
+        </div>
+      </div>
 
-      <div className="flex justify-between text-[22px] py-8 px-6">
-        <span>Total</span>
-        <span className="text-[#EFE7BC]">${order.totalAmount.toFixed(2)}</span>
+      <p className="mt-8 text-[#3C3C3C] text-[16px]">
+        سفارش به زودی آماده می‌شود.
+      </p>
+
+      <div className="mt-12 w-full max-w-[320px] bg-[#FDFBF7] border border-[#D5D1C8] rounded-[16px] shadow-sm px-6 py-5 text-center">
+        <p className="text-[14px] text-[#3C3C3C] mb-2">زمان تقریبی آماده سازی</p>
+        <p className="text-[28px] font-bold text-[#8B6B4A]">15-20 دقیقه</p>
       </div>
     </div>
   );

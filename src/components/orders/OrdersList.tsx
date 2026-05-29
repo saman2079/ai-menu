@@ -1,42 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import OrderedCard from "./OrderedCard";
-import Button from "@/components/UI/Button";
-import { useOrderStore } from "@/app/hooks/orderStore";
-import Invoice from "./Invoice";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import OrderedCard from "./OrderedCard";
+import { useCartStore } from "@/store/cart-store";
 
+interface Props {
+  onSubmitted: (order: any) => void;
+}
 
-export default function OrdersList() {
-  const orders = useOrderStore((s) => s.orders);
-  const removeOrder = useOrderStore((s) => s.removeOrder);
-  const updateQty = useOrderStore((s) => s.updateQty);
-  const clearCart = useOrderStore((s) => s.clearCart);
-  const setInvoiceData = useOrderStore((s) => s.setInvoiceData);
-  const openInvoice = useOrderStore((s) => s.openInvoice);
-  const invoiceData = useOrderStore((s) => s.invoiceData);
+export default function OrdersList({ onSubmitted }: Props) {
+  const { items, increase, decrease,  } = useCartStore();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedOrder, setSubmittedOrder] = useState<any>(null);
-
-  // اگه قبلاً سفارش داده، از API بخون
-  useEffect(() => {
-    const tableId = localStorage.getItem("tableId");
-    const sessionId = localStorage.getItem("sessionId");
-    if (!tableId || !sessionId) return;
-
-    fetch(`/api/orders/current?tableId=${tableId}&sessionId=${sessionId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.order) setSubmittedOrder(data.order);
-      })
-      .catch(console.error);
-  }, []);
 
   const handleAcceptOrder = async () => {
-    if (orders.length === 0) return;
+    if (items.length === 0) return;
+
     setIsSubmitting(true);
+
     try {
       const tableId = localStorage.getItem("tableId");
       const sessionId = localStorage.getItem("sessionId");
@@ -49,91 +31,106 @@ export default function OrdersList() {
           customerPhone: "0000000000",
           tableId: tableId ? parseInt(tableId) : null,
           sessionId,
-          items: orders.map((item) => ({
-            menuItem: item.id,
+          items: items.map((item) => ({
+            menuItem: item._id,
             quantity: item.quantity,
           })),
         }),
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.message);
+      if (!res.ok) throw new Error(result.message || "خطا در ثبت سفارش");
 
-      setInvoiceData(result.order);
-      openInvoice();
-      clearCart();
-      setSubmittedOrder(result.order);
-    } catch (error: any) {
-      console.error("Error submitting order:", error);
-      alert("Failed to submit order. Please try again.");
+      onSubmitted(result.order);
+    } catch (error) {
+      console.error(error);
+      alert("ثبت سفارش انجام نشد. دوباره تلاش کنید.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // اگه سفارش ثبت شده، نمایش بده
-  if (submittedOrder && orders.length === 0) {
-    return (
-      <div className="mt-10 w-full flex flex-col items-center gap-4 pb-20">
-        <p className="text-green-400 text-[18px]">✅ Order submitted!</p>
-        <Invoice />
-      </div>
-    );
-  }
+  const itemsTotal = items.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
+
+  const serviceFee = items.length > 0 ? 70000 : 0;
+  const total = itemsTotal + serviceFee;
 
   return (
-    <>
-      <div className="mt-10 flex flex-col gap-4 w-full pb-32 px-4">
-        {orders.length > 0 ? (
+    <div className="w-full">
+      <h1 className="text-center text-[22px] font-bold text-[#1E1E1E] mb-6">
+        سفارش من
+      </h1>
+
+      <div className="bg-[#1E1E1E] text-white rounded-[12px] py-3 text-center mb-4">
+        <p className="text-[13px]">میز شما</p>
+        <p className="text-[18px] font-bold">
+          {typeof window !== "undefined"
+            ? localStorage.getItem("tableId") || "12"
+            : "12"}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {items.length > 0 ? (
           <AnimatePresence>
-            {orders.map((item, index) => (
+            {items.map((item, index) => (
               <motion.div
-                key={item.id}
+                key={item._id}
                 layout
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 100, transition: { duration: 0.3 } }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: 50 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
               >
                 <OrderedCard
                   item={item}
-                  onRemove={removeOrder}
-                  onQtyChange={updateQty}
+                  onIncrease={() => increase(item._id)}
+                  onDecrease={() => {
+                    if (item.quantity <= 1) removeFromCart(item._id);
+                    else decrease(item._id);
+                  }}
                 />
               </motion.div>
             ))}
           </AnimatePresence>
         ) : (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center text-light text-xl mt-10"
-          >
-            Your cart is empty.
-          </motion.p>
+          <p className="text-center text-[#666] mt-10">سبد سفارش شما خالی است.</p>
         )}
       </div>
 
-      {orders.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 w-full max-w-[450px] mx-auto h-[120px] 
-                     bg-gradient-to-t from-dark to-transparent pointer-events-none">
-          <motion.div
-            initial={{ y: 100 }}
-            animate={{ y: 0 }}
-            transition={{ type: "spring", stiffness: 100 }}
-            className="px-6 fixed bottom-8 w-full max-w-[450px] pointer-events-auto"
-          >
-            <Button
-              variant="primary"
-              className="w-full font-bold text-xl p-4 shadow-lg shadow-primary/20"
+      {items.length > 0 && (
+        <>
+          <div className="mt-6 text-[14px] text-[#555] space-y-3 px-1">
+            <div className="flex justify-between">
+              <span>جمع سفارشات</span>
+              <span>{itemsTotal.toLocaleString()} تومان</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span>هزینه سرویس</span>
+              <span>{serviceFee.toLocaleString()} تومان</span>
+            </div>
+
+            <div className="flex justify-between font-bold text-[16px] text-[#1E1E1E] pt-2">
+              <span>مجموع کل</span>
+              <span>{total.toLocaleString()} تومان</span>
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <button
               onClick={handleAcceptOrder}
               disabled={isSubmitting}
+              className="w-full h-[52px] rounded-[14px] bg-[#1E1E1E] text-white font-bold text-[16px] disabled:opacity-50"
             >
-              {isSubmitting ? "Submitting..." : "Confirm Order"}
-            </Button>
-          </motion.div>
-        </div>
+              {isSubmitting ? "در حال ثبت..." : "ثبت سفارش"}
+            </button>
+          </div>
+        </>
       )}
-    </>
+    </div>
   );
 }

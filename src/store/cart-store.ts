@@ -1,90 +1,98 @@
 import { create } from "zustand";
 
 export interface CartItem {
-    _id: string;
-    name: string;
-    price: number;
-    image: string;
-    quantity: number;
+  _id: string;
+  name: string;
+  price: number;
+  image: string;
+  quantity: number;
 }
 
 interface CartStore {
+  items: CartItem[];
 
-    items: CartItem[];
+  addToCart: (item: Omit<CartItem, "quantity">) => void;
+  increase: (id: string) => void;
+  decrease: (id: string) => void;
+  removeFromCart: (id: string) => void;
+  clearCart: () => void;
 
-    addToCart: (item: Omit<CartItem, "quantity">) => void;
-
-    increase: (id: string) => void;
-
-    decrease: (id: string) => void;
+  totalItems: () => number;
+  totalAmount: () => number;
 }
 
-export const useCartStore = create<CartStore>((set) => ({
+export const useCartStore = create<CartStore>((set, get) => ({
+  items: [],
 
-    items: [],
+  addToCart: (item) =>
+    set((state) => {
+      const existingItem = state.items.find((i) => i._id === item._id);
 
-    addToCart: (item) =>
-        set((state) => {
+      if (existingItem) {
+        return {
+          items: state.items.map((i) =>
+            i._id === item._id
+              ? {
+                  ...i,
+                  quantity: i.quantity + 1,
+                }
+              : i
+          ),
+        };
+      }
 
-            const existingItem =
-                state.items.find(
-                    (i) => i._id === item._id
-                );
+      return {
+        items: [
+          ...state.items,
+          {
+            ...item,
+            quantity: 1,
+          },
+        ],
+      };
+    }),
 
-            // اگر محصول داخل سبد بود
-            if (existingItem) {
-
-                return {
-                    items: state.items.map((i) =>
-
-                        i._id === item._id
-                            ? {
-                                ...i,
-                                quantity: i.quantity + 1,
-                            }
-                            : i
-                    ),
-                };
+  increase: (id) =>
+    set((state) => ({
+      items: state.items.map((item) =>
+        item._id === id
+          ? {
+              ...item,
+              quantity: item.quantity + 1,
             }
+          : item
+      ),
+    })),
 
-            // اگر داخل سبد نبود
-            return {
-                items: [
-                    ...state.items,
-                    {
-                        ...item,
-                        quantity: 1,
-                    },
-                ],
-            };
-        }),
+  decrease: (id) =>
+    set((state) => ({
+      items: state.items
+        .map((item) =>
+          item._id === id
+            ? {
+                ...item,
+                quantity: item.quantity - 1,
+              }
+            : item
+        )
+        .filter((item) => item.quantity > 0),
+    })),
 
-    increase: (id) =>
-        set((state) => ({
-            items: state.items.map((item) =>
-                item._id === id
-                    ? {
-                        ...item,
-                        quantity: item.quantity + 1,
-                    }
-                    : item
-            ),
-        })),
+  removeFromCart: (id) =>
+    set((state) => ({
+      items: state.items.filter((item) => item._id !== id),
+    })),
 
-    decrease: (id) =>
-        set((state) => ({
+  clearCart: () => set({ items: [] }),
 
-            items: state.items
-                .map((item) =>
+  totalItems: () => {
+    return get().items.reduce((sum, item) => sum + item.quantity, 0);
+  },
 
-                    item._id === id
-                        ? {
-                            ...item,
-                            quantity: item.quantity - 1,
-                        }
-                        : item
-                )
-                .filter((item) => item.quantity > 0),
-
-        })),
+  totalAmount: () => {
+    return get().items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+  },
 }));
