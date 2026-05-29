@@ -15,7 +15,7 @@ export default function ButtonNav() {
   ];
 
   return (
-    <div className="fixed bottom-2 left-1/2 -translate-x-1/2 w-full rounded-b-[5px] max-w-[420px] bg-white shadow-[0px_-2px_4.7px_0px_#00000021] z-50">
+    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full rounded-b-[5px] max-w-[420px] bg-white shadow-[0px_-2px_4.7px_0px_#00000021] z-50">
       <div className="flex justify-around items-center py-3 ">
 
         {links.map((item) => {
