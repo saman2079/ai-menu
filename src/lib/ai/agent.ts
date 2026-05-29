@@ -1,7 +1,7 @@
 import { Restaurant } from "@/lib/models/Restaurant";
-import { MenuItem } from "../models/MenuItem";
+import { MenuItem } from "@/lib/models/MenuItem";
 import { Order } from "@/lib/models/Order";
-
+import "@/lib/models/Category";
 // تابع کمکی برای استخراج آیتم‌ها با استفاده از خود مدل زبانی
 async function extractItemsWithAI(
   conversationText: string,
@@ -35,7 +35,8 @@ Output ONLY a JSON array: [{"name": "exact menu item", "quantity": number}]. If 
   }
 
   const data = await response.json();
-  const jsonStr = data.choices[0]?.message?.content || "[]";
+  const jsonStr = data.choices?.[0]?.message?.content || "[]";
+
   try {
     return JSON.parse(jsonStr);
   } catch (e) {
@@ -50,19 +51,21 @@ function fallbackUserMessageExtraction(
   menuItems: any[]
 ): any[] {
   const found: any[] = [];
-  const lowerText = userText.toLowerCase();
+  const lowerText = (userText || "").toLowerCase();
 
   menuItems.forEach((item: any) => {
-    const name = item.name.toLowerCase();
+    const name = (item.name || "").toLowerCase();
     const words = name.split(/\s+/).filter((w: string) => w.length > 1);
 
     const matchedWord = words.find((word) => {
       if (!lowerText.includes(word)) return false;
+
       const otherItems = menuItems.filter(
         (other: any) => other._id.toString() !== item._id.toString()
       );
+
       return !otherItems.some((other: any) =>
-        other.name.toLowerCase().includes(word)
+        (other.name || "").toLowerCase().includes(word)
       );
     });
 
@@ -79,6 +82,90 @@ function fallbackUserMessageExtraction(
   return found;
 }
 
+function normalizeText(text: string) {
+  return (text || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function getFilteredMenuItemsByUserText(userText: string, menuItems: any[]) {
+  const text = normalizeText(userText);
+
+  const showAllKeywords = [
+    "منو",
+    "menu",
+    "همه",
+    "کل منو",
+    "لیست",
+    "لیست غذا",
+    "غذاها",
+  ];
+
+  if (showAllKeywords.some((k) => text.includes(normalizeText(k)))) {
+    return menuItems;
+  }
+
+  const categoriesMap = new Map();
+
+  for (const item of menuItems) {
+    if (!item.category) continue;
+
+    const categoryId =
+      item.category?._id?.toString?.() || item.category?.toString?.();
+    if (!categoryId) continue;
+
+    if (!categoriesMap.has(categoryId)) {
+      categoriesMap.set(categoryId, {
+        _id: categoryId,
+        name: item.category?.name || "",
+        title: item.category?.title || "",
+        slug: item.category?.slug || "",
+      });
+    }
+  }
+
+  const categories = Array.from(categoriesMap.values());
+
+  const matchedCategory = categories.find((cat: any) => {
+    const values = [
+      normalizeText(cat.name),
+      normalizeText(cat.title),
+      normalizeText(cat.slug),
+    ].filter(Boolean);
+
+    return values.some((value) => {
+      if (text.includes(value) || value.includes(text)) return true;
+
+      const words = value.split(" ").filter(Boolean);
+      return words.some((word) => word.length > 1 && text.includes(word));
+    });
+  });
+
+  if (matchedCategory) {
+    return menuItems.filter((item: any) => {
+      const itemCategoryId =
+        item.category?._id?.toString?.() || item.category?.toString?.();
+      return itemCategoryId === matchedCategory._id;
+    });
+  }
+
+  const directMatches = menuItems.filter((item: any) => {
+    const itemName = normalizeText(item.name);
+
+    if (text.includes(itemName) || itemName.includes(text)) return true;
+
+    const words = itemName.split(" ").filter(Boolean);
+    return words.some((word) => word.length > 1 && text.includes(word));
+  });
+
+  if (directMatches.length > 0) {
+    return directMatches;
+  }
+
+  return [];
+}
+
 // --- تابع اصلی ---
 export async function runAgentChatMode(
   messages: any[],
@@ -86,45 +173,82 @@ export async function runAgentChatMode(
   tableId: number | null
 ) {
   try {
-    const menuItems = await MenuItem.find().select("name price _id").lean();
+    const menuItems = await MenuItem.find({ isAvailable: true })
+      .select("name price _id images description category")
+      .populate("category", "name slug title")
+      .lean();
+
     const restaurant = await Restaurant.findOne({ slug: "restaurant" });
     if (!restaurant) throw new Error("Restaurant not found");
 
     const menuText = menuItems
-      .map((item: any) => `- ${item.name}: ${item.price.toLocaleString()} تومان`)
+      .map(
+        (item: any) =>
+          `- ${item.name}: ${Number(item.price || 0).toLocaleString()} تومان${item.description ? ` | ${item.description}` : ""
+          }`
+      )
       .join("\n");
 
-    // ✅ پرامپت بهبودیافته - تأکید بر درج ORDER_ITEMS در تمام تغییرات
-    const systemPrompt = `شما یک دستیار هوشمند سفارش‌گیری هستید.
+    const lastUserMessage =
+      [...messages].reverse().find((m: any) => m.role === "user")?.content || "";
 
-**منوی رستوران:**
-${menuText}
-
-**قوانین حیاتی:**
-1. فقط درباره رستوران، منو و سفارش غذا صحبت کنید.
-2. هرگاه سفارش جدیدی دریافت کردید یا سفارش موجود را تغییر دادید، حتماً در همان پاسخ عبارت [ORDER_ITEMS:نام دقیق از منو:تعداد, ...] را قرار دهید.
-   مثال: [ORDER_ITEMS:کباب کوبیده:2,دوغ:1]
-3. وقتی مشتری تایید کرد، حتماً [SUBMIT_ORDER] را در پاسخ قرار دهید.
-4. نام غذاها را دقیقاً از منو استفاده کنید (نه اختصاری).
-5. **در تگ ORDER_ITEMS، همیشه وضعیت نهایی سفارش را نشان دهید (نه فقط تغییرات).**
-6. اگر مشتری غذا را عوض کرد، در تگ ORDER_ITEMS فقط غذاهای جدید را قرار دهید و غذاهای قدیمی حذف شده را حذف کنید.
-7. مودب و دوستانه باشید.
-8. به سوالات خارج از موضوع پاسخ ندهید.
-
-**الگوها:**
-- کاربر: "یه کوبیده"  
-  دستیار: "یک کباب کوبیده (۲۵۰,۰۰۰). تایید می‌کنید؟ [ORDER_ITEMS:کباب کوبیده:1]"
-- کاربر: "آره"  
-  دستیار: "سفارش ثبت شد. [SUBMIT_ORDER]"
-- کاربر: "نه، بجای کوبیده برگ بزار"  
-  دستیار: "تغییر اعمال شد. کباب برگ (۳۵۰,۰۰۰) جایگزین کباب کوبیده شد. تایید می‌کنید؟ [ORDER_ITEMS:کباب برگ:1]"`;
-
-    const allMessages = [
-      { role: "system", content: systemPrompt },
-      ...messages.map((m: any) => ({ role: m.role, content: m.content })),
+    const confirmationWords = [
+      "بله",
+      "آره",
+      "اره",
+      "تایید",
+      "تأیید",
+      "اوکی",
+      "ok",
+      "yes",
     ];
 
-    console.log("🔵 [AGENT-CHAT] Calling GapGPT...");
+    const isConfirmation = confirmationWords.some((word) =>
+      normalizeText(lastUserMessage).includes(normalizeText(word))
+    );
+
+    const filteredMenuItems = getFilteredMenuItemsByUserText(
+      lastUserMessage,
+      menuItems
+    );
+
+    let menuCards = filteredMenuItems.map((item: any) => ({
+      id: item._id.toString(),
+      name: item.name,
+      price: item.price,
+      description: item.description || "",
+      images: item.images || [],
+    }));
+
+    const systemPrompt = `
+شما دستیار سفارش‌گیر رستوران ${restaurant.name} هستید.
+
+وظایف شما:
+1) خیلی کوتاه، طبیعی و مودبانه به کاربر جواب بده.
+2) اگر کاربر درخواست دیدن منو یا بخشی از منو را داشت، داخل متن پیام اسم غذاها و قیمت‌ها را تکرار نکن.
+3) وقتی قرار است کارت‌های منو در فرانت نمایش داده شوند، فقط یک پیام کوتاه بده. مثل:
+- "منو برای شما نمایش داده شد."
+- "این بخش از منو برای شما نمایش داده شد."
+- "لطفاً از بین آیتم‌ها انتخاب کنید."
+4) اگر کاربر سفارشی ثبت کرد و آیتم‌ها مشخص بودند، در پاسخ خود حتماً تگ [SUBMIT_ORDER] را قرار بده.
+5) اگر آیتم‌ها و تعدادشان را تشخیص دادی، این تگ را هم دقیقاً اضافه کن:
+[ORDER_ITEMS:[{"name":"نام دقیق آیتم","quantity":2}]]
+6) فقط از آیتم‌های واقعی همین منو استفاده کن و اسم جدید نساز.
+7) اگر کاربر سلام یا سؤال عمومی داشت، عادی جواب بده.
+8) اگر چیزی نامشخص بود، خیلی کوتاه سؤال تکمیلی بپرس.
+
+منوی رستوران:
+${menuText}
+`.trim();
+
+    const apiMessages = [
+      { role: "system", content: systemPrompt },
+      ...messages.map((m: any) => ({
+        role: m.role,
+        content: m.content,
+      })),
+    ];
+
     const response = await fetch("https://api.gapgpt.app/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -133,199 +257,220 @@ ${menuText}
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        messages: allMessages,
-        temperature: 0.7,
+        messages: apiMessages,
+        temperature: 0.4,
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ GapGPT Error:", errorText);
-      throw new Error(`API Error: ${response.status}`);
+      const errText = await response.text();
+      console.error("GapGPT error:", response.status, errText);
+      return {
+        message: "خطا در دریافت پاسخ از دستیار.",
+        menuCards,
+        addedItems: [],
+        orderSubmitted: false,
+        orderId: null,
+      };
     }
 
     const data = await response.json();
-    const aiMessage =
-      data.choices[0]?.message?.content || "متاسفم، نتوانستم پاسخ دهم.";
-    console.log("🤖 AI Response:", aiMessage);
+    const aiMessage = data.choices?.[0]?.message?.content || "پاسخی دریافت نشد";
 
-    // 1. ✅ جستجوی **آخرین** تگ [ORDER_ITEMS] در کل مکالمه
+    const hasSubmitOrder = aiMessage.includes("[SUBMIT_ORDER]");
+
+    const allConversationText = messages
+      .map((m: any) => `${m.role}: ${m.content}`)
+      .join("\n");
+
+    const orderItemsMatch = aiMessage.match(/\[ORDER_ITEMS:(.*?)\]/s);
+
+    let parsedItemsFromTag: any[] = [];
+    if (orderItemsMatch?.[1]) {
+      try {
+        parsedItemsFromTag = JSON.parse(orderItemsMatch[1]);
+      } catch (e) {
+        console.error("Failed to parse ORDER_ITEMS:", orderItemsMatch[1]);
+      }
+    }
+
     let addedItems: any[] = [];
-    
-    // جمع‌آوری تمام پیام‌های دستیار (قدیمی + جدید)
-    const allAssistantMessages = [
-      ...messages.filter((m: any) => m.role === "assistant").map((m: any) => m.content),
-      aiMessage,
-    ];
-    
-    // جستجوی تمام تگ‌های ORDER_ITEMS
-    const allTags: string[] = [];
-    allAssistantMessages.forEach(content => {
-      const tags = content.match(/\[ORDER_ITEMS:(.+?)\]/g);
-      if (tags) {
-        tags.forEach(tag => allTags.push(tag));
-      }
-    });
-    
-    // استفاده از آخرین تگ
-    if (allTags.length > 0) {
-      const lastTag = allTags[allTags.length - 1];
-      const match = lastTag.match(/\[ORDER_ITEMS:(.+?)\]/);
-      if (match) {
-        const itemsStr = match[1];
-        const itemParts = itemsStr.split(",");
-        itemParts.forEach((part) => {
-          const [rawName, qtyStr] = part.trim().split(":");
-          const itemName = rawName.trim();
-          const qty = parseInt(qtyStr) || 1;
 
-          const menuMatch = menuItems.find(
-            (m: any) => m.name.trim() === itemName
+    // اول از تگ ORDER_ITEMS استفاده کن
+    if (parsedItemsFromTag.length > 0) {
+      addedItems = parsedItemsFromTag
+        .map((ordered: any) => {
+          const matched = menuItems.find(
+            (menu: any) =>
+              normalizeText(menu.name) === normalizeText(ordered.name)
           );
-          if (menuMatch) {
-            addedItems.push({
-              id: menuMatch._id.toString(),
-              name: menuMatch.name,
-              price: menuMatch.price,
-              quantity: qty,
-            });
-          }
-        });
-        console.log("📋 استخراج از آخرین ORDER_ITEMS:", addedItems);
+
+          if (!matched) return null;
+
+          return {
+            id: matched._id.toString(),
+            name: matched.name,
+            price: matched.price,
+            quantity: Number(ordered.quantity || 1),
+          };
+        })
+        .filter(Boolean);
+    }
+
+    // اگه خالی بود، با AI extract کن
+    if (hasSubmitOrder && addedItems.length === 0) {
+      addedItems = fallbackUserMessageExtraction(
+        lastUserMessage,
+        menuItems
+      );
+      if (addedItems.length > 0) {
+        menuCards = [];
+      }
+      const aiExtracted = await extractItemsWithAI(allConversationText, menuText);
+
+      if (Array.isArray(aiExtracted) && aiExtracted.length > 0) {
+        addedItems = aiExtracted
+          .map((ordered: any) => {
+            const matched = menuItems.find(
+              (menu: any) =>
+                normalizeText(menu.name) === normalizeText(ordered.name)
+            );
+
+            if (!matched) return null;
+
+            return {
+              id: matched._id.toString(),
+              name: matched.name,
+              price: matched.price,
+              quantity: Number(ordered.quantity || 1),
+            };
+          })
+          .filter(Boolean);
       }
     }
 
-    // 2. اگر آیتمی پیدا نشد ولی تگ SUBMIT_ORDER وجود دارد، با AI استخراج کن
-    if (addedItems.length === 0 && aiMessage.includes("[SUBMIT_ORDER]")) {
-      console.log("⚠️ تگ ORDER_ITEMS یافت نشد. درخواست استخراج با AI...");
-      const fullConversation = allMessages
-        .map((m: any) => `${m.role}: ${m.content}`)
-        .join("\n");
-      const extracted = await extractItemsWithAI(fullConversation, menuText);
-      addedItems = extracted.map((e: any) => {
-        const match = menuItems.find(
-          (m: any) => m.name.trim() === e.name.trim()
-        );
-        if (!match) return null;
-        return {
-          id: match._id.toString(),
-          name: match.name,
-          price: match.price,
-          quantity: e.quantity || 1,
-        };
-      }).filter(Boolean);
-      console.log("📋 استخراج توسط AI:", addedItems);
+    // اگه بازم خالی بود، fallback کن
+    if (hasSubmitOrder && addedItems.length === 0) {
+      addedItems = fallbackUserMessageExtraction(lastUserMessage, menuItems);
     }
 
-    // 3. آخرین شانس: جستجوی اضطراری در پیام‌های کاربر
-    if (addedItems.length === 0 && aiMessage.includes("[SUBMIT_ORDER]")) {
-      const userText = messages
-        .filter((m: any) => m.role === "user")
-        .map((m: any) => m.content)
-        .join(" ");
-      addedItems = fallbackUserMessageExtraction(userText, menuItems);
-      console.log("📋 استخراج از پیام‌های کاربر (حالت اضطراری):", addedItems);
-    }
-
-    // حذف تگ‌ها از پاسخ قابل نمایش
     const displayMessage = aiMessage
       .replace(/\[SUBMIT_ORDER\]/g, "")
-      .replace(/\[ORDER_ITEMS:(.+?)\]/g, "")
+      .replace(/\[ORDER_ITEMS:.*?\]/gs, "")
       .trim();
 
-    console.log("📋 آیتم‌های نهایی:", addedItems);
-
-    let orderId = null;
     let orderSubmitted = false;
+    let orderId: string | null = null;
 
-    if (aiMessage.includes("[SUBMIT_ORDER]") && addedItems.length > 0) {
-      console.log("🔥 ثبت/به‌روزرسانی سفارش...");
-      const orderItems = addedItems.map((item) => ({
-        menuItem: item.id,
-        name: item.name,
-        quantity: item.quantity || 1,
-        price: item.price,
-        selectedOptions: {},
-      }));
+    // فقط وقتی سفارش ثبت کن که هم تگ وجود داشته باشه هم آیتم
+    if (hasSubmitOrder && addedItems.length > 0) {
+      try {
+        const orderItems = addedItems.map((item) => ({
+          menuItem: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        }));
 
-      const totalAmount = addedItems.reduce(
-        (sum, item) => sum + item.price * (item.quantity || 1),
-        0
-      );
+        const totalAmount = orderItems.reduce(
+          (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+          0
+        );
 
-      let order;
-      if (tableId && sessionId) {
-        order = await Order.findOne({
-          tableId,
+        // اول چک کن Order قبلی هست یا نه
+        const existingOrder = await Order.findOne({
           sessionId,
-          isFinalized: false,
-        });
-      } else if (sessionId) {
-        order = await Order.findOne({
-          sessionId,
-          isFinalized: false,
-        });
-      }
-
-      if (order) {
-        // ✅ **اصلاح اصلی: جایگزینی کامل آیتم‌ها به جای ادغام**
-        console.log("🔄 به‌روزرسانی سفارش موجود:", order._id);
-        console.log("📦 آیتم‌های قبلی:", order.items.length);
-        console.log("📦 آیتم‌های جدید:", orderItems.length);
-        
-        // جایگزینی کامل لیست آیتم‌ها
-        order.items = orderItems;
-        order.totalAmount = totalAmount;
-        await order.save();
-
-        const populated = await Order.findById(order._id)
-          .populate("restaurant", "name")
-          .populate("items.menuItem", "name price")
-          .lean();
-        if (global.io) global.io.emit("order-updated", populated);
-        orderId = populated._id.toString();
-        orderSubmitted = true;
-        
-        console.log("✅ سفارش با موفقیت به‌روزرسانی شد");
-      } else {
-        // ایجاد سفارش جدید
-        console.log("🆕 ایجاد سفارش جدید");
-        const lastOrder = await Order.findOne().sort({ orderNumber: -1 });
-        const orderNumber = (lastOrder?.orderNumber || 0) + 1;
-
-        const newOrder = await Order.create({
           restaurant: restaurant._id,
-          orderNumber,
-          customerName: `مهمان ${sessionId.slice(0, 6)}`,
-          customerPhone: "N/A",
-          items: orderItems,
-          totalAmount,
-          tableId: tableId || null,
-          sessionId,
-          status: "pending",
           isFinalized: false,
         });
 
-        const populated = await Order.findById(newOrder._id)
-          .populate("restaurant", "name")
-          .populate("items.menuItem", "name price")
-          .lean();
-        if (global.io) global.io.emit("new-order", populated);
-        orderId = populated._id.toString();
-        orderSubmitted = true;
+        if (existingOrder) {
+          // آپدیت Order قبلی
+          existingOrder.items = orderItems;
+          existingOrder.totalAmount = totalAmount;
+          if (tableId) {
+            existingOrder.tableId = String(tableId);
+          }
+          const savedOrder = await existingOrder.save();
+          orderId = savedOrder._id.toString();
+          orderSubmitted = true;
+
+          // populate کن برای socket
+          const populated = await Order.findById(savedOrder._id)
+            .populate("restaurant", "name")
+            .populate("items.menuItem", "name price");
+
+          if ((global as any).io && populated) {
+            (global as any).io.emit("order-updated", populated);
+          }
+        } else {
+          // Order جدید بساز
+          const orderCount = await Order.countDocuments({
+            restaurant: restaurant._id,
+          });
+
+          const newOrder = await Order.create({
+            restaurant: restaurant._id,
+            sessionId,
+            tableId: tableId ? String(tableId) : undefined,
+            orderNumber: orderCount + 1,
+            customerName: `مهمان ${sessionId.slice(0, 6)}`,
+            customerPhone: "N/A",
+            items: orderItems,
+            totalAmount,
+            status: "pending",
+            isFinalized: false,
+          });
+
+          orderId = newOrder._id.toString();
+          orderSubmitted = true;
+
+          // populate کن برای socket
+          const populated = await Order.findById(newOrder._id)
+            .populate("restaurant", "name")
+            .populate("items.menuItem", "name price");
+
+          if ((global as any).io && populated) {
+            (global as any).io.emit("new-order", populated);
+          }
+        }
+      } catch (orderError) {
+        console.error("Order creation/update failed:", orderError);
+        // اگه سفارش ثبت نشد، برگرد با پیام خطا
+        return {
+          message: "متأسفانه در ثبت سفارش خطایی رخ داد. لطفاً دوباره تلاش کنید.",
+          menuCards,
+          addedItems,
+          orderSubmitted: false,
+          orderId: null,
+        };
       }
-    } else {
-      console.log("⚠️ [SUBMIT_ORDER] یا آیتم یافت نشد");
     }
 
     return {
-      message: displayMessage,
+      message: displayMessage || "درخواست شما بررسی شد.",
+      menuCards,
       addedItems,
       orderSubmitted,
       orderId,
     };
-  } catch (error: any) {
-    console.error("❌ Error:", error);
-    throw error;
+  } catch (orderError: any) {
+    console.log("================================");
+    console.log("ORDER ERROR");
+    console.log(orderError);
+    console.log("MESSAGE:", orderError?.message);
+    console.log("ERRORS:", orderError?.errors);
+    console.log("STACK:", orderError?.stack);
+    console.log("================================");
+
+    return {
+      message:
+        orderError?.message ||
+        "متأسفانه در ثبت سفارش خطایی رخ داد. لطفاً دوباره تلاش کنید.",
+      menuCards,
+      addedItems,
+      orderSubmitted: false,
+      orderId: null,
+    };
   }
 }

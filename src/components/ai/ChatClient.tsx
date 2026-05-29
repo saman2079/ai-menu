@@ -11,11 +11,21 @@ import ChatHeader from "./ChatHeader";
 import ChatMessages from "./ChatMessages";
 import ChatInput from "./ChatInput";
 
-
+interface MenuCard {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  images: string[];
+}
 
 export interface Message {
   role: "user" | "assistant";
   content: string;
+  menuCards?: MenuCard[];
+  addedItems?: any[];
+  orderSubmitted?: boolean;
+  orderId?: string | null;
 }
 
 function ChatClient() {
@@ -112,6 +122,11 @@ function ChatClient() {
             data.message ||
             data.response ||
             "پاسخی دریافت نشد",
+          menuCards: data.menuCards || [],
+          addedItems: data.addedItems || [],
+          orderSubmitted: data.orderSubmitted || false,
+          orderId: data.orderId || null,
+
         };
 
         setMessages((prev) => [
@@ -145,6 +160,7 @@ function ChatClient() {
       sessionId,
     ]
   );
+
 
   return (
     <div className="bg-[#E4E4E4] flex flex-col gap-2 text-[16px] text-[#201F20] h-screen overflow-hidden">

@@ -40,6 +40,8 @@ function ChatMessages({
 
   }, [messages, loading]);
 
+
+
   return (
     <div className='p-10 min-h-[60dvh] overflow-y-auto max-h-[70dvh]'>
 
@@ -74,6 +76,9 @@ function ChatMessages({
                 role={msg.role}
                 content={
                   msg.content
+                }
+                menuCards={
+                  msg.menuCards
                 }
               />
 
