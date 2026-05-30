@@ -26,6 +26,8 @@ export default function MenuList({ items }: Props) {
     return acc;
   }, {});
 
+  console.log(items)
+
   return (
     <div className="space-y-10 pb-30 px-5">
 
